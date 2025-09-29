@@ -1,43 +1,21 @@
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8" />
-<title>Flood Map Example</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<!-- Leaflet CSS -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-<style>
-  #map { height: 100vh; width: 100%; }
-</style>
-</head>
-<body>
-<div id="map"></div>
-
-<!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-<script>
-// 1. Create the map
-var map = L.map('map').setView([14.5995, 120.9842], 12); // Manila center
 
-// 2. Base layer
+<div id="map" style="height:500px;"></div>
+
+<script>
+var map = L.map('map').setView([8.5,124.6], 7);
+
+// Base map
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap contributors'
+  attribution: '© OpenStreetMap contributors'
 }).addTo(map);
 
-// 3. Example flood layer (replace with real data source)
-var floodLayer = L.tileLayer.wms('https://globalfloods-ows.ecmwf.int/glofas-ows/ows', {
-    layers: 'GloFAS_forecast',   // sample; use the actual layer ID you need
+// CEMS Flood Layer (example GFM WMS)
+L.tileLayer.wms('https://geoserver.globalfloods.eu/gfm/ows?', {
+    layers: 'FloodExtent',     // replace with exact layer name
     format: 'image/png',
     transparent: true,
-    opacity: 0.5
+    attribution: '© Copernicus EMS'
 }).addTo(map);
-
-
-// 4. Click to show coordinates
-map.on('click', function(e){
-    alert('Lat: ' + e.latlng.lat.toFixed(5) + ', Lng: ' + e.latlng.lng.toFixed(5));
-});
 </script>
-</body>
-
-</html>
