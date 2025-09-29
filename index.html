@@ -2,144 +2,118 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Flood Map with GloFAS Integration</title>
+  <title>GloFAS Flood Map</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
-  <!-- Geocoder / Search Bar -->
+  <!-- Geocoder / Search -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
   <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
 
-  <!-- TimeDimension -->
+  <!-- TimeDimension (optional time slider) -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet-timedimension/dist/leaflet.timedimension.control.css" />
   <script src="https://unpkg.com/leaflet-timedimension/dist/leaflet.timedimension.min.js"></script>
 
   <style>
-    body { margin: 0; padding: 0; }
-    #map { position: absolute; top: 0; bottom: 0; left: 0; right: 0; }
+    html, body { height: 100%; margin: 0; padding: 0; }
+    #map { width: 100%; height: 100%; }
   </style>
 </head>
 <body>
-  <div id="map"></div>
-  <script>
-    // Initialize map with time dimension
-    var map = L.map('map', {
-      center: [8.5, 124.6],  // center roughly over Philippines
-      zoom: 7,
-      timeDimension: true,
-      timeDimensionControl: true,
-      timeDimensionOptions: {
-        timeInterval: "P2D/PT1H",
-        period: "PT1H"
-      }
-    });
-
-    // Base layers
-    var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors'
-    }).addTo(map);
-
-    var topo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenTopoMap'
-    });
-
-    // GloFAS WMS-T endpoint (discovered from docs)
-    var glofasWmsUrl = 'https://ows.globalfloods.eu/glofas-ows/ows.py';
-
-    // Example layer name — may need to change
-    var layerName = 'FloodHazard100y';
-
-    var glofas = L.tileLayer.wms(glofasWmsUrl, {
-      layers: layerName,
-      format: 'image/png',
-      transparent: true,
-      version: '1.3.0'
-    });
-
-    var floodTimeLayer = L.timeDimension.layer.wms(glofas, {
-      updateTimeDimension: true,
-      setDefaultTime: true,
-    }).addTo(map);
-
-    // Real-time markers (replace with your API)
-    function fetchMarkers() {
-      var url = 'https://your-api.example.com/markers';  // your real endpoint
-      fetch(url)
-        .then(r => r.json())
-        .then(geojson => {
-          if (window.markerLayer) {
-            map.removeLayer(window.markerLayer);
-          }
-          window.markerLayer = L.geoJSON(geojson, {
-            onEachFeature: (feature, layer) => {
-              let props = feature.properties || {};
-              const content = Object.keys(props).map(k => `<b>${k}</b>: ${props[k]}`).join('<br>');
-              layer.bindPopup(content);
-            }
-          }).addTo(map);
-        })
-        .catch(err => console.warn('Error fetching markers:', err));
+<div id="map"></div>
+<script>
+  // Initialize map with optional time dimension
+  var map = L.map('map', {
+    center: [8.5, 124.6],   // Philippines example
+    zoom: 7,
+    timeDimension: true,
+    timeDimensionControl: true,
+    timeDimensionOptions: {
+      timeInterval: "P3D/PT6H",
+      period: "PT6H"
     }
-    fetchMarkers();
-    setInterval(fetchMarkers, 60000);
+  });
 
-    // Layer control
-    var baseMaps = {
-      "OpenStreetMap": osm,
-      "Topographic": topo
-    };
-    var overlayMaps = {
-      "GloFAS Forecast": floodTimeLayer
-    };
-    var ctrl = L.control.layers(baseMaps, overlayMaps).addTo(map);
+  // Base layers
+  var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors'
+  }).addTo(map);
 
-    map.on('layeradd', (e) => {
-      if (e.layer === window.markerLayer) {
-        ctrl.addOverlay(window.markerLayer, 'Real-time Markers');
-      }
-    });
+  var topo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenTopoMap contributors'
+  });
 
-    // Search bar
-    L.Control.geocoder({ defaultMarkGeocode: true }).addTo(map);
+  // ✅ Public GloFAS WMS endpoint
+  var glofasWmsUrl = 'https://ows.globalfloods.eu/glofas-ows/ows.py';
 
-    // User location
-    map.locate({ setView: false });
-    map.on('locationfound', (e) => {
-      L.circleMarker(e.latlng, { radius: 8, color: 'blue' })
-        .bindPopup("You are here")
-        .addTo(map);
-    });
-    map.on('locationerror', (e) => {
-      console.warn("Location error:", e.message);
-    });
+  // ✅ Sample layer name (from GetCapabilities)
+  var layerName = 'GLOFAS_flood_hazard';
 
-    // Popups by clicking flood layer (GetFeatureInfo)
-    floodTimeLayer.on('timeload', () => {
-      map.on('click', function(evt) {
-        let bounds = map.getBounds().toBBoxString();
-        let size = map.getSize();
-        let point = map.latLngToContainerPoint(evt.latlng);
-        let url = glofasWmsUrl +
-          '?service=WMS&version=1.3.0&request=GetFeatureInfo' +
-          '&layers=' + layerName +
-          '&query_layers=' + layerName +
-          '&bbox=' + bounds +
-          '&width=' + size.x + '&height=' + size.y +
-          '&info_format=application/json' +
-          '&i=' + Math.floor(point.x) + '&j=' + Math.floor(point.y);
-        fetch(url)
-          .then(r => r.json())
-          .then(json => {
-            if (json.features && json.features.length > 0) {
-              let info = json.features.map(f => JSON.stringify(f.properties)).join('<br>');
-              L.popup().setLatLng(evt.latlng).setContent(info).openOn(map);
-            }
-          })
-          .catch(err => console.warn('FeatureInfo error:', err));
-      });
-    });
+  // Base WMS layer
+  var glofasLayer = L.tileLayer.wms(glofasWmsUrl, {
+    layers: layerName,
+    format: 'image/png',
+    transparent: true,
+    version: '1.3.0'
+  });
 
-  </script>
+  // Wrap WMS in TimeDimension layer (will gracefully do nothing if no time dimension)
+  var floodTimeLayer = L.timeDimension.layer.wms(glofasLayer, {
+    updateTimeDimension: true,
+    setDefaultTime: true
+  }).addTo(map);
+
+  // Layer control
+  var baseMaps = {
+    "OpenStreetMap": osm,
+    "Topographic": topo
+  };
+  var overlayMaps = {
+    "GloFAS Flood Hazard": floodTimeLayer
+  };
+  L.control.layers(baseMaps, overlayMaps).addTo(map);
+
+  // Search bar
+  L.Control.geocoder({ defaultMarkGeocode: true }).addTo(map);
+
+  // User location
+  map.locate({ setView: false });
+  map.on('locationfound', function(e) {
+    L.circleMarker(e.latlng, { radius: 8, color: 'blue' })
+      .bindPopup("You are here")
+      .addTo(map);
+  });
+
+  // Example popup query using GetFeatureInfo
+  map.on('click', function(evt) {
+    var size = map.getSize();
+    var bounds = map.getBounds().toBBoxString();
+    var point = map.latLngToContainerPoint(evt.latlng, map.getZoom());
+    var url = glofasWmsUrl +
+      '?service=WMS&version=1.3.0&request=GetFeatureInfo' +
+      '&layers=' + layerName +
+      '&query_layers=' + layerName +
+      '&bbox=' + bounds +
+      '&width=' + size.x + '&height=' + size.y +
+      '&info_format=application/json' +
+      '&i=' + Math.floor(point.x) +
+      '&j=' + Math.floor(point.y);
+    fetch(url)
+      .then(r => r.json())
+      .then(data => {
+        if (data && data.features && data.features.length > 0) {
+          let info = JSON.stringify(data.features[0].properties, null, 2);
+          L.popup().setLatLng(evt.latlng).setContent('<pre>' + info + '</pre>').openOn(map);
+        } else {
+          L.popup().setLatLng(evt.latlng).setContent("No data here").openOn(map);
+        }
+      })
+      .catch(err => console.error('GetFeatureInfo error:', err));
+  });
+
+</script>
 </body>
 </html>
