@@ -1,119 +1,98 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
   <meta charset="utf-8" />
-  <title>GloFAS Flood Map</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Flood Map with Real-Time Data</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- Leaflet -->
+  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-
-  <!-- Geocoder / Search -->
+  <!-- Leaflet Search CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
-  <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
-
-  <!-- TimeDimension (optional time slider) -->
+  <!-- Time slider -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet-timedimension/dist/leaflet.timedimension.control.css" />
-  <script src="https://unpkg.com/leaflet-timedimension/dist/leaflet.timedimension.min.js"></script>
 
   <style>
-    html, body { height: 100%; margin: 0; padding: 0; }
-    #map { width: 100%; height: 100%; }
+    html, body, #map { height: 100%; margin: 0; }
+    .leaflet-control-geocoder { background: white; }
   </style>
 </head>
 <body>
-<div id="map"></div>
-<script>
-  // Initialize map with optional time dimension
+  <div id="map"></div>
+
+  <!-- JS Libraries -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+  <script src="https://unpkg.com/leaflet.locatecontrol/dist/L.Control.Locate.min.js"></script>
+  <script src="https://unpkg.com/leaflet-timedimension/dist/leaflet.timedimension.min.js"></script>
+
+  <script>
+  // 1️⃣ Base map
   var map = L.map('map', {
-    center: [8.5, 124.6],   // Philippines example
-    zoom: 7,
-    timeDimension: true,
-    timeDimensionControl: true,
-    timeDimensionOptions: {
-      timeInterval: "P3D/PT6H",
-      period: "PT6H"
-    }
+      center: [8.48, 124.65], // Example: CDO, Philippines
+      zoom: 6,
+      timeDimension: true,
+      timeDimensionOptions: {
+        timeInterval: "P7D/PT3H", // Last 7 days, 3-hour steps
+        period: "PT24H"
+      },
+      timeDimensionControl: true
   });
 
-  // Base layers
   var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap contributors'
+      maxZoom: 19,
+      attribution: '© OpenStreetMap contributors'
   }).addTo(map);
 
-  var topo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenTopoMap contributors'
-  });
+  // 2️⃣ NASA GIBS Flood Layer (time-enabled)
+  var nasaFloodLayer = L.tileLayer.wms(
+      "https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi",
+      {
+        layers: "MODIS_Terra_Flood_Mask", // Near real-time flood detection
+        format: "image/png",
+        transparent: true
+      }
+  );
+  var tdNasaFlood = L.timeDimension.layer.wms(nasaFloodLayer, {updateTimeDimension: true});
 
-  // ✅ Public GloFAS WMS endpoint
-  var glofasWmsUrl = 'https://ows.globalfloods.eu/glofas-ows/ows.py';
-
-  // ✅ Sample layer name (from GetCapabilities)
-  var layerName = 'GLOFAS_flood_hazard';
-
-  // Base WMS layer
-  var glofasLayer = L.tileLayer.wms(glofasWmsUrl, {
-    layers: layerName,
-    format: 'image/png',
-    transparent: true,
-    version: '1.3.0'
-  });
-
-  // Wrap WMS in TimeDimension layer (will gracefully do nothing if no time dimension)
-  var floodTimeLayer = L.timeDimension.layer.wms(glofasLayer, {
-    updateTimeDimension: true,
-    setDefaultTime: true
-  }).addTo(map);
-
-  // Layer control
-  var baseMaps = {
-    "OpenStreetMap": osm,
-    "Topographic": topo
-  };
-  var overlayMaps = {
-    "GloFAS Flood Hazard": floodTimeLayer
-  };
+  // 3️⃣ Layer Control
+  var baseMaps = { "OpenStreetMap": osm };
+  var overlayMaps = { "NASA Flood Mask": tdNasaFlood };
   L.control.layers(baseMaps, overlayMaps).addTo(map);
+  tdNasaFlood.addTo(map); // default ON
 
-  // Search bar
-  L.Control.geocoder({ defaultMarkGeocode: true }).addTo(map);
+  // 4️⃣ Search bar (OpenStreetMap Geocoding)
+  L.Control.geocoder({
+      defaultMarkGeocode: false
+  })
+  .on('markgeocode', function(e) {
+      map.setView(e.geocode.center, 12);
+      L.marker(e.geocode.center).addTo(map)
+          .bindPopup(e.geocode.name).openPopup();
+  })
+  .addTo(map);
 
-  // User location
-  map.locate({ setView: false });
-  map.on('locationfound', function(e) {
-    L.circleMarker(e.latlng, { radius: 8, color: 'blue' })
-      .bindPopup("You are here")
-      .addTo(map);
+  // 5️⃣ Locate (User location)
+  L.control.locate({ position: 'topleft', flyTo: true }).addTo(map);
+
+  // 6️⃣ Real-time Markers Example (replace with your own feed)
+  var markers = [
+      { name: "Example Sensor 1", lat: 8.5, lon: 124.6 },
+      { name: "Example Sensor 2", lat: 7.2, lon: 125.4 }
+  ];
+  markers.forEach(function(m){
+      L.marker([m.lat, m.lon])
+       .addTo(map)
+       .bindPopup(`<b>${m.name}</b><br>Lat: ${m.lat}, Lon: ${m.lon}`);
   });
 
-  // Example popup query using GetFeatureInfo
-  map.on('click', function(evt) {
-    var size = map.getSize();
-    var bounds = map.getBounds().toBBoxString();
-    var point = map.latLngToContainerPoint(evt.latlng, map.getZoom());
-    var url = glofasWmsUrl +
-      '?service=WMS&version=1.3.0&request=GetFeatureInfo' +
-      '&layers=' + layerName +
-      '&query_layers=' + layerName +
-      '&bbox=' + bounds +
-      '&width=' + size.x + '&height=' + size.y +
-      '&info_format=application/json' +
-      '&i=' + Math.floor(point.x) +
-      '&j=' + Math.floor(point.y);
-    fetch(url)
-      .then(r => r.json())
-      .then(data => {
-        if (data && data.features && data.features.length > 0) {
-          let info = JSON.stringify(data.features[0].properties, null, 2);
-          L.popup().setLatLng(evt.latlng).setContent('<pre>' + info + '</pre>').openOn(map);
-        } else {
-          L.popup().setLatLng(evt.latlng).setContent("No data here").openOn(map);
-        }
-      })
-      .catch(err => console.error('GetFeatureInfo error:', err));
+  // 7️⃣ Popup on map click
+  map.on('click', function(e){
+      L.popup()
+       .setLatLng(e.latlng)
+       .setContent("You clicked at " + e.latlng.lat.toFixed(4) + ", " + e.latlng.lng.toFixed(4))
+       .openOn(map);
   });
-
-</script>
+  </script>
 </body>
 </html>
