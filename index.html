@@ -25,12 +25,13 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 }).addTo(map);
 
 // 3. Example flood layer (replace with real data source)
-var floodLayer = L.tileLayer.wms('https://ahocevar.com/geoserver/wms', {
-    layers: 'topp:states', // demo layer
+var floodLayer = L.tileLayer.wms('https://globalfloods-ows.ecmwf.int/glofas-ows/ows', {
+    layers: 'GloFAS_forecast',   // sample; use the actual layer ID you need
     format: 'image/png',
     transparent: true,
     opacity: 0.5
 }).addTo(map);
+
 
 // 4. Click to show coordinates
 map.on('click', function(e){
@@ -38,4 +39,5 @@ map.on('click', function(e){
 });
 </script>
 </body>
+
 </html>
